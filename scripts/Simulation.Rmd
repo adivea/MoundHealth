@@ -1,0 +1,108 @@
+---
+title: "Simulation"
+author: "Rebecca Folmer Schade"
+date: "16 jun 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "..")
+```
+
+### Loading packages
+
+```{r}
+pacman::p_load(pacman, tidyverse)
+```
+
+### Loading data 
+
+```{r}
+# Loading the "modified_vulnerability" dataset
+mounds <- read_csv("data/modified_vulnerability.csv")
+
+# Removing NAs 
+variables <- c("LU_Arnd", "Robbed", "HeghtMx", "distTownkm", "distBGkm")
+mounds <- mounds %>% drop_na(any_of(variables))
+```
+
+## Simulations
+The data will be simulated to match five(?) different situations:    
+
+1. A conversion of all forest to agriculture
+2. A conversion of all forest to pasture
+3. A conversion of all pasture to annual agriculture
+4. An increase in distance of one standard deviation from the nearest edge of a city, town, or village
+5. An increase in distance of one standard deviation from the Bulgarian border
+
+### Forest to agriculture 
+
+```{r}
+#=====> Simulating data 
+simulation_1 <- mounds
+
+# Re-leveling the factor to convert categories
+simulation_1$LU_Arnd <- as.factor(simulation_1$LU_Arnd)
+levels(simulation_1$LU_Arnd) # How many levels are there?
+# > The "Perennial" category covers both perennial and annual agriculture, "Urban" covers both urban and others
+
+simulation_1$LU_Arnd[1:10] # Having a look at the variable
+new_levels_1<- c("Agriculture", "Pasture", "Agriculture", "Scrub", "Other") # Making a list of new levels (in order)
+levels(simulation_1$LU_Arnd) <- new_levels_1 # Re-naming the levels
+simulation_1$LU_Arnd[1:10] # Testing if it worked
+```
+
+### Forest to pasture
+
+```{r}
+#=====> Simulating data 
+simulation_2 <- mounds
+
+# Re-leveling the factor to convert categories
+simulation_2$LU_Arnd <- as.factor(simulation_2$LU_Arnd)
+levels(simulation_2$LU_Arnd) # How many levels are there?
+
+simulation_2$LU_Arnd[1:10] # Having a look at the variable
+new_levels_2<- c("Pasture", "Pasture", "Perennial", "Scrub", "Urban") # Making a list of new levels (in order)
+levels(simulation_2$LU_Arnd) <- new_levels_2 # Re-naming the levels
+simulation_2$LU_Arnd[1:10] # Testing if it worked
+```
+
+### Pasture to annual agriculture
+
+```{r}
+#=====> Simulating data 
+simulation_3 <- mounds
+
+# Re-leveling the factor to convert categories
+simulation_3$LU_Arnd <- as.factor(simulation_3$LU_Arnd)
+levels(simulation_3$LU_Arnd) # How many levels are there?
+
+simulation_3$LU_Arnd[1:10] # Having a look at the variable
+new_levels_3 <- c("Forest", "Perennial", "Perennial", "Scrub", "Urban") # Making a list of new levels (in order)
+levels(simulation_3$LU_Arnd) <- new_levels_3 # Re-naming the levels
+simulation_3$LU_Arnd[1:10] # Testing if it worked
+```
+
+###  Increase in distance from the nearest edge of a city, town, or village
+
+```{r}
+#=====> Simulating data 
+simulation_4 <- mounds
+
+# Calculating the standard deviation and adding it to the distTownkm variable. 
+simulation_4$distTownkm <- simulation_4$distTownkm + sd(simulation_4$distTownkm)
+```
+
+###  Increase in distance from the nearest edge of a ciry, town, or village
+
+```{r}
+#=====> Simulating data 
+simulation_5 <- mounds
+
+# Calculating the standard deviation and adding it to the distTownkm variable. 
+simulation_5$distBGkm <- simulation_5$distBGkm + sd(simulation_5$distBGkm)
+```
+
+
