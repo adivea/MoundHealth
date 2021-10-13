@@ -9,22 +9,123 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Introduction 
+In this script, data collected on mounds in the Yambol region is processed and converted from a spatial object (shapefile) supported by the **sf** package into a dataframe in the csv format. 
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r, echo = FALSE}
+# Loading packages
+library(tidyverse)
+library(sf)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+## Loading the dataset
+The dataset is loaded, and filtered into another dataset based on a conservative estimate of which of the collected datapoints indicate burial mounds.  
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r data}
+# Loading in the master_sp from shapefile enriched_all.shp
+master_sp <- st_read("../data/enriched_all.shp")
+summary(master_sp)
+
+# Creating a conservative dataset
+conservative_sp <- master_sp %>% filter(Type == "Burial Mound" | Type == "Extinct Burial Mound") 
+
+# Turning the spatial object into a tibble
+tble_mounds <- as.tibble(st_drop_geometry(conservative_sp))
+class(tble_mounds)
+
+# the variable HeghtMx (mound height) bahaves strangely as an artifact of loading the spatial object
+# This is a quick-fix for that problem
+tble_mounds$HeghtMx <- tble_mounds$HeghtMx %>% as.character() %>% as.numeric()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Fixing landuse 
+
+Lets review the most common categories of landuse AROUND mounds
+
+```{r}
+tble_mounds %>%
+  filter(Type == "Burial Mound" | Type == "Extinct Burial Mound") %>%   group_by(LU_Arnd) %>% 
+  tally() %>% 
+  mutate(perc = round(n/sum(n)*100, 2)) %>% 
+  arrange(desc(n)) %>% 
+  as.matrix() %>% 
+  print()
+```
+Annual agriculture, pasture and scrub are the most common categories, with forest perhaps the last meaningful category. Perennial agriculture, other and urban might be best merged into Other, or perennial with agriculture and the rest in Other. 
+
+It might be a good idea to merge the small categories into larger ones, especially where is similar relationship (Annual and Perennial, Urban and Other)
+```{r}
+# > Re-leveling the factor to merge categories
+# reviewing the variable
+levels(tble_mounds$LU_Arnd) # How many levels are there?
+tble_mounds$LU_Arnd[1:10] # Having a look at the variable
+
+# Creating a list of new labels/levels (in order)
+new_levels <- c("Agriculture", "Forest", "Other", "Pasture", "Agriculture", "Scrub", "Other")
+levels(tble_mounds$LU_Arnd) <- new_levels # Re-naming the levels
+tble_mounds$LU_Arnd[1:10] # Testing if it worked
+```
+
+## Creating 'Robbed' column
+To take whether or not a mound hs been robbed into account in later analysis. 
+
+```{r}
+tble_mounds <- tble_mounds %>%
+  mutate(Robbed = str_extract(PrncSOI, "Loot")) %>%
+  mutate(Robbed = case_when(is.na(Robbed) ~ "No",
+                            Robbed == "Loot" ~ "Yes"))
+```
+
+## Adding distances to town and Bulgarian border in kms
+if it is easier for the logit output...
+
+```{r}
+tble_mounds$distBGkm <- tble_mounds$distBG/1000 
+tble_mounds$distTownkm <- tble_mounds$distTwn/1000 
+```
+
+## Clarifying condition
+We need to streamline a bit the Condition variable, clarifying NAs and recoding number 6 as it should be 1-5 Likert scale. Beware that this code will clear uncertainty such as 3? or 2? , where condition was hard to gauge in the field.
+
+```{r}
+# Having a look at the recorded data 
+levels(factor(tble_mounds$Conditn))
+
+# simplifying the variable
+tble_mounds <- tble_mounds %>%
+  mutate(Condition = as.character(str_extract(Conditn, "\\d"))) %>%
+  mutate(Condition = case_when(Condition == 0 ~ "NA",
+                               Condition == 6 ~ "5",
+                               Condition != 0 ~ Condition))
+
+tble_mounds$Condition <- as.factor(tble_mounds$Condition)
+unique(tble_mounds$Condition)
+```
+
+## Subsetting the dataset
+Only the variables relevant in later analysis are kept.
+
+```{r}
+# Selecting columns
+analysis_tble <- tble_mounds %>% dplyr::select(TRAP, 
+                                               Type, 
+                                               LU_Arnd, 
+                                               HeghtMx, 
+                                               distBG, 
+                                               distTwn, 
+                                               Robbed, 
+                                               distTownkm, 
+                                               distBGkm, 
+                                               Condition)
+
+# Re-nameing columns
+new_colnames <- c("TRAP", "Type", "LU_Around", "Height_Mx", "Dist_BG", "Dist_Town", "Robbed", "Dist_Town_KM", "Dist_GB_KM", "Condition")
+colnames(analysis_tble) <- new_colnames
+```
+
+## Writing a csv with the result
+
+```{r}
+write_csv(analysis_tble, "../data/analysis_data.csv")
+```
